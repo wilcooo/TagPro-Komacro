@@ -6,7 +6,7 @@
 // @include      *.koalabeast.com*
 // @include      *.jukejuice.com*
 // @include      *.newcompte.fr*
-// @require      https://github.com/wilcooo/TagPro-UserscriptLibrary/raw/master/tpul.lib.js
+// @require      https://greasyfork.org/scripts/371240/code/TagPro%20Userscript%20Library.js
 // @downloadURL  https://github.com/wilcooo/TagPro-Komacro/raw/master/tpkm.user.js
 // @supportURL   https://www.reddit.com/message/compose/?to=Wilcooo
 // @icon         https://github.com/wilcooo/TagPro-Komacro/raw/master/MacroKey.png
