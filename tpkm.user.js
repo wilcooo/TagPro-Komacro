@@ -2,7 +2,7 @@
 // @name         TagPro Komacro
 // @description  Macro's // edit in-game // map-specific // no-script compatible // key combinations
 // @author       Ko
-// @version      1.0
+// @version      2.0
 // @include      *.koalabeast.com*
 // @include      *.jukejuice.com*
 // @include      *.newcompte.fr*
@@ -24,6 +24,7 @@
 
 
     const chars={8:"⌫",9:"↹",13:"↩",16:"⇧",17:"✲",18:"⎇",19:"❚❚",20:"⇪",27:"⎋",32:"␣",33:"⇞",34:"⇟",35:"⇲",36:"⇱",37:"◀",38:"▲",39:"▶",40:"▼",45:"⎀",46:"⌦",48:"0",49:"1",50:"2",51:"3",52:"4",53:"5",54:"6",55:"7",56:"8",57:"9",65:"A",66:"B",67:"C",68:"D",69:"E",70:"F",71:"G",72:"H",73:"I",74:"J",75:"K",76:"L",77:"M",78:"N",79:"O",80:"P",81:"Q",82:"R",83:"S",84:"T",85:"U",86:"V",87:"W",88:"X",89:"Y",90:"Z",91:navigator.platform.toLowerCase().includes("mac")?"⌘":"⊞",93:"≣",96:"0️⃣",97:"1️⃣",98:"2️⃣",99:"3️⃣",100:"4️⃣",101:"5️⃣",102:"6️⃣",103:"7️⃣",104:"8️⃣",105:"9️⃣",106:"✖️",107:"➕",109:"➖",110:"▣",111:"➗",112:"F1",113:"F2",114:"F3",115:"F4",116:"F5",117:"F6",118:"F7",119:"F8",120:"F9",121:"F10",122:"F11",123:"F12",144:"⇭",145:"⇳",182:"💻",183:"🖩",186:";",187:"=",188:",",189:"-",190:".",191:"/",192:"`",219:"[",220:"\\",221:"]",222:"'"};
+
 
 
 
@@ -62,6 +63,9 @@
     styleSheet.insertRule(` .komacro-combo::placeholder { font-size: small; font-style: italic; }`);
 
     styleSheet.insertRule(` .komacro-del:hover, .komacro-del:active, .komacro-del:focus { background: darkred; }`);
+
+    styleSheet.insertRule(` #Komacro_wrapper [draggable=true] { cursor: move; }`);
+    styleSheet.insertRule(` .komacro-dragging { background: #827717; border-radius: 16px; }`);
 
 
 
@@ -150,6 +154,7 @@
         macro.ctrlKey = keyevent.ctrlKey && keyevent.keyCode != 17;
         macro.altKey = keyevent.altKey && keyevent.keyCode != 18;
         macro.metaKey = keyevent.metaKey && keyevent.keyCode != 91;
+        macro.location = keyevent.location;
 
         save_macros();
 
@@ -157,6 +162,32 @@
     }
 
 
+
+    var dragging = null;
+
+    function ondragstart() {
+        dragging = this;
+        this.classList.add('komacro-dragging');
+    }
+
+    function ondragend() {
+        dragging = this;
+        this.classList.remove('komacro-dragging');
+    }
+
+    function ondragover() {
+        if (this.parentNode !== dragging.parentNode) return;
+
+        const old_pos = [...dragging.parentNode.children].indexOf(dragging);
+        const new_pos = [...this.parentNode.children].indexOf(this);
+
+        if (new_pos < old_pos) this.parentNode.insertBefore(dragging, this);
+        else this.parentNode.insertBefore(dragging, this.nextSibling);
+
+        let old_i = macros.indexOf(dragging.macro);
+        let new_i = macros.indexOf(this.macro);
+        return macros.splice(new_i, 0, macros.splice(old_i,1)[0]);
+    }
 
     // Create a new macro entry in the config panel.
     // Either based on an existing macro, or a new line
@@ -176,7 +207,13 @@
         }
 
         var entry = document.createElement('div');
-        entry.className = "config_var form-group";
+        entry.className = "form-group";
+
+        // Dragging
+        entry.draggable = true;
+        entry.ondragstart = ondragstart;
+        entry.ondragend = ondragend;
+        entry.ondragover = ondragover;
 
         entry.macro = macro;
 
@@ -263,6 +300,7 @@
             show_mirrored: {
                 type: 'checkbox',
                 default: false,
+                section: ['',"You can drag your Komacro's to reorder them."],
                 label: "Distinguish mirrored maps:",
             }
         },
@@ -295,6 +333,13 @@
                     settings.save();
                     show_mirrored = settings.get('show_mirrored');
                     update_maps();
+                }
+
+                // Show a notification if the script has been updated
+
+                if (GM_getValue('macros') && GM_getValue('version',0) < GM_info.script.version ) {
+                    tpul.notify('Komacro has been updated: you can now reorder by dragging!', 'success', 12e3);
+                    GM_setValue('version', GM_info.script.version);
                 }
 
             },
@@ -363,7 +408,8 @@
             tagpro.ready(function() {
                 tagpro.socket.on('map', function(map) {
                     maps.then(function(maps){
-                        current_map = maps.rotation.find(m=> m.author == map.info.author && m.name == map.info.name).key;
+                        var mapobj = maps.rotation.find(m=> m.author == map.info.author && m.name == map.info.name);
+                        if (mapobj) current_map = mapobj.key;
                     });
                 });
             });
@@ -384,7 +430,8 @@
                 if (!map) setTimeout(getMapFromDom, 500, ++i);
 
                 maps.then(function(maps){
-                    current_map = maps.rotation.find(m=> m.author == map[2] && m.name == map[1]).key;
+                    var mapobj = maps.rotation.find(m=> m.author == map[2] && m.name == map[1]);
+                    if (mapobj) current_map = mapobj.key;
                 });
 
             })(0);
@@ -484,11 +531,11 @@
             for (var macro of macros) {
 
                 if (macro.keyCode == keyevent.keyCode &&
-                    (macro.location == undefined || macro.location == keyevent.location) &&
-                    !!macro.ctrlKey == keyevent.ctrlKey &&
-                    !!macro.shiftKey == keyevent.shiftKey &&
-                    !!macro.altKey == keyevent.altKey &&
-                    !!macro.metaKey == keyevent.metaKey) {
+                    (!macro.location || macro.location == keyevent.location) &&
+                    !!macro.ctrlKey == !!keyevent.ctrlKey &&
+                    !!macro.shiftKey == !!keyevent.shiftKey &&
+                    !!macro.altKey == !!keyevent.altKey &&
+                    !!macro.metaKey == !!keyevent.metaKey) {
 
                     // Send a macro of which the map matches:
 
@@ -502,7 +549,7 @@
                     // Save the global macro, but don't send it yet.
                     // because we could find another map-specific macro.
 
-                    if (!macro.map) global_macro = macro;
+                    if (!macro.map || macro.map == "null") global_macro = macro;
                 }
             }
 
